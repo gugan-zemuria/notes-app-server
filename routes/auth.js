@@ -8,6 +8,8 @@ router.post('/signup', async (req, res) => {
   try {
     const { email, password } = req.body;
 
+    console.log('Sign up attempt:', { email, hasPassword: !!password });
+
     if (!email || !password) {
       return res.status(400).json({ error: 'Email and password are required' });
     }
@@ -18,8 +20,11 @@ router.post('/signup', async (req, res) => {
     });
 
     if (error) {
+      console.error('Supabase sign up error:', error.message);
       return res.status(400).json({ error: error.message });
     }
+
+    console.log('Sign up successful for:', email);
 
     res.json({
       message: 'User created successfully. Please check your email for verification.',
@@ -36,6 +41,8 @@ router.post('/signin', async (req, res) => {
   try {
     const { email, password } = req.body;
 
+    console.log('Sign in attempt:', { email, hasPassword: !!password });
+
     if (!email || !password) {
       return res.status(400).json({ error: 'Email and password are required' });
     }
@@ -46,21 +53,24 @@ router.post('/signin', async (req, res) => {
     });
 
     if (error) {
+      console.error('Supabase sign in error:', error.message);
       return res.status(400).json({ error: error.message });
     }
+
+    console.log('Sign in successful for:', email);
 
     // Set session cookie
     res.cookie('sb-access-token', data.session.access_token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
       maxAge: 24 * 60 * 60 * 1000 // 24 hours
     });
 
     res.cookie('sb-refresh-token', data.session.refresh_token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
       maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
     });
 
@@ -118,14 +128,14 @@ router.post('/callback', async (req, res) => {
     res.cookie('sb-access-token', data.session.access_token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
       maxAge: 24 * 60 * 60 * 1000 // 24 hours
     });
 
     res.cookie('sb-refresh-token', data.session.refresh_token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
       maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
     });
 
