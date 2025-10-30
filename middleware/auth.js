@@ -6,6 +6,7 @@ const authenticateUser = async (req, res, next) => {
     const accessToken = req.cookies['sb-access-token'] || req.headers.authorization?.replace('Bearer ', '');
 
     if (!accessToken) {
+      console.log('No access token found. Cookies:', Object.keys(req.cookies), 'Auth header:', req.headers.authorization);
       return res.status(401).json({ error: 'Access token required' });
     }
 

@@ -63,6 +63,17 @@ app.get('/', (req, res) => {
     });
 });
 
+// Debug endpoint to check cookies
+app.get('/api/debug/cookies', (req, res) => {
+    res.json({
+        cookies: req.cookies,
+        headers: {
+            authorization: req.headers.authorization,
+            cookie: req.headers.cookie
+        }
+    });
+});
+
 // Auth routes
 app.use('/api/auth', authRoutes);
 
