@@ -65,13 +65,34 @@ app.get('/', (req, res) => {
 
 // Debug endpoint to check cookies
 app.get('/api/debug/cookies', (req, res) => {
+    console.log('Debug cookies request from:', req.headers.origin);
+    console.log('Cookies received:', req.cookies);
+    console.log('Cookie header:', req.headers.cookie);
+    
     res.json({
         cookies: req.cookies,
         headers: {
             authorization: req.headers.authorization,
-            cookie: req.headers.cookie
-        }
+            cookie: req.headers.cookie,
+            origin: req.headers.origin
+        },
+        cookieCount: Object.keys(req.cookies).length
     });
+});
+
+// Test endpoint to set a cookie
+app.post('/api/debug/set-cookie', (req, res) => {
+    console.log('Setting test cookie from:', req.headers.origin);
+    
+    res.cookie('test-cookie', 'test-value', {
+        httpOnly: true,
+        secure: true,
+        sameSite: 'none',
+        path: '/',
+        maxAge: 60000 // 1 minute
+    });
+    
+    res.json({ message: 'Test cookie set' });
 });
 
 // Auth routes

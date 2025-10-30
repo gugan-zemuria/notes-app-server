@@ -59,18 +59,24 @@ router.post('/signin', async (req, res) => {
 
     console.log('Sign in successful for:', email);
 
-    // Set session cookie
-    res.cookie('sb-access-token', data.session.access_token, {
+    // Set session cookies with proper cross-origin settings
+    const cookieOptions = {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+      secure: true, // Always use secure in production
+      sameSite: 'none', // Required for cross-origin cookies
+      path: '/',
+      domain: undefined // Let browser set the domain
+    };
+    
+    console.log('Setting signin cookies with options:', cookieOptions);
+    
+    res.cookie('sb-access-token', data.session.access_token, {
+      ...cookieOptions,
       maxAge: 24 * 60 * 60 * 1000 // 24 hours
     });
 
     res.cookie('sb-refresh-token', data.session.refresh_token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+      ...cookieOptions,
       maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
     });
 
@@ -142,13 +148,16 @@ router.post('/callback', async (req, res) => {
 
     console.log('Session created successfully for user:', data.user?.email);
 
-    // Set session cookies with proper domain settings
+    // Set session cookies with proper cross-origin settings
     const cookieOptions = {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
-      path: '/'
+      secure: true, // Always use secure in production
+      sameSite: 'none', // Required for cross-origin cookies
+      path: '/',
+      domain: undefined // Let browser set the domain
     };
+    
+    console.log('Setting cookies with options:', cookieOptions);
 
     res.cookie('sb-access-token', data.session.access_token, {
       ...cookieOptions,
@@ -214,13 +223,16 @@ router.post('/token', async (req, res) => {
 
     console.log('Token verified for user:', user?.email);
 
-    // Set session cookies
+    // Set session cookies with proper cross-origin settings
     const cookieOptions = {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
-      path: '/'
+      secure: true, // Always use secure in production
+      sameSite: 'none', // Required for cross-origin cookies
+      path: '/',
+      domain: undefined // Let browser set the domain
     };
+    
+    console.log('Setting cookies with options:', cookieOptions);
 
     res.cookie('sb-access-token', access_token, {
       ...cookieOptions,
@@ -248,8 +260,17 @@ router.post('/token', async (req, res) => {
 router.get('/user', async (req, res) => {
   try {
     const accessToken = req.cookies['sb-access-token'];
-
-    console.log('Get user request:', { hasToken: !!accessToken });
+    
+    console.log('Get user request:', { 
+      hasToken: !!accessToken,
+      allCookies: Object.keys(req.cookies),
+      cookieValues: req.cookies,
+      headers: {
+        cookie: req.headers.cookie,
+        origin: req.headers.origin,
+        userAgent: req.headers['user-agent']?.substring(0, 50)
+      }
+    });
 
     if (!accessToken) {
       return res.status(401).json({ error: 'No access token' });
