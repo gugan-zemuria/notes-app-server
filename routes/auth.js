@@ -259,17 +259,22 @@ router.post('/token', async (req, res) => {
 // Get current user
 router.get('/user', async (req, res) => {
   try {
-    const accessToken = req.cookies['sb-access-token'];
+    // Try to get token from Authorization header first, then cookies as fallback
+    let accessToken = null;
+    
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      accessToken = authHeader.substring(7);
+      console.log('Token from Authorization header');
+    } else {
+      accessToken = req.cookies['sb-access-token'];
+      console.log('Token from cookies');
+    }
     
     console.log('Get user request:', { 
       hasToken: !!accessToken,
-      allCookies: Object.keys(req.cookies),
-      cookieValues: req.cookies,
-      headers: {
-        cookie: req.headers.cookie,
-        origin: req.headers.origin,
-        userAgent: req.headers['user-agent']?.substring(0, 50)
-      }
+      tokenSource: authHeader ? 'header' : 'cookie',
+      origin: req.headers.origin
     });
 
     if (!accessToken) {
