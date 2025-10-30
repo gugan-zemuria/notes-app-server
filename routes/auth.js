@@ -219,19 +219,19 @@ router.post('/verify-jwt', async (req, res) => {
     }
 
     const { user, error } = verifySupabaseToken(token);
-    
+
     if (error) {
       // Also provide decoded token for debugging
       const decoded = decodeToken(token);
-      return res.status(401).json({ 
-        error: 'Invalid token', 
+      return res.status(401).json({
+        error: 'Invalid token',
         details: error,
-        decoded: decoded 
+        decoded: decoded
       });
     }
 
-    res.json({ 
-      message: 'Token is valid', 
+    res.json({
+      message: 'Token is valid',
       user: {
         id: user.sub,
         email: user.email,

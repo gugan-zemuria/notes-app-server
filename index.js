@@ -19,7 +19,8 @@ const supabase = createClient(
 
 // Middleware
 const allowedOrigins = [
-    process.env.CLIENT_URL // Production Vercel URL
+    process.env.CLIENT_URL,
+    'https://notes-app-xl-eight-17.vercel.app' // Fallback Vercel URL
 ].filter(Boolean);
 
 app.use(cors({
@@ -27,9 +28,14 @@ app.use(cors({
         // Allow requests with no origin (mobile apps, Postman, etc.)
         if (!origin) return callback(null, true);
         
+        // Log for debugging
+        console.log('Request from origin:', origin);
+        console.log('Allowed origins:', allowedOrigins);
+        
         if (allowedOrigins.indexOf(origin) !== -1) {
             callback(null, true);
         } else {
+            console.error('CORS blocked origin:', origin);
             callback(new Error('Not allowed by CORS'));
         }
     },
@@ -40,7 +46,11 @@ app.use(cookieParser());
 
 // Routes
 app.get('/', (req, res) => {
-    res.json({ message: 'Notes API Server' });
+    res.json({ 
+        message: 'Notes API Server',
+        clientUrl: process.env.CLIENT_URL || 'NOT SET',
+        allowedOrigins: allowedOrigins
+    });
 });
 
 // Auth routes
