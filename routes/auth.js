@@ -94,14 +94,20 @@ router.post('/google', async (req, res) => {
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: `${process.env.CLIENT_URL}/auth/callback`
+        redirectTo: `${process.env.CLIENT_URL}/auth/callback`,
+        queryParams: {
+          access_type: 'offline',
+          prompt: 'consent',
+        }
       }
     });
 
     if (error) {
+      console.error('Google OAuth error:', error.message);
       return res.status(400).json({ error: error.message });
     }
 
+    console.log('OAuth URL generated:', data.url);
     res.json({ url: data.url });
   } catch (error) {
     console.error('Google OAuth error:', error);
@@ -114,28 +120,43 @@ router.post('/callback', async (req, res) => {
   try {
     const { code } = req.body;
 
+    console.log('OAuth callback received:', { code: !!code });
+
     if (!code) {
+      console.error('No authorization code provided');
       return res.status(400).json({ error: 'Authorization code required' });
     }
 
+    console.log('Exchanging code for session...');
     const { data, error } = await supabase.auth.exchangeCodeForSession(code);
 
     if (error) {
+      console.error('Code exchange error:', error.message);
       return res.status(400).json({ error: error.message });
     }
 
-    // Set session cookies
-    res.cookie('sb-access-token', data.session.access_token, {
+    if (!data.session) {
+      console.error('No session returned from code exchange');
+      return res.status(400).json({ error: 'Failed to create session' });
+    }
+
+    console.log('Session created successfully for user:', data.user?.email);
+
+    // Set session cookies with proper domain settings
+    const cookieOptions = {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+      path: '/'
+    };
+
+    res.cookie('sb-access-token', data.session.access_token, {
+      ...cookieOptions,
       maxAge: 24 * 60 * 60 * 1000 // 24 hours
     });
 
     res.cookie('sb-refresh-token', data.session.refresh_token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+      ...cookieOptions,
       maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
     });
 
@@ -149,7 +170,7 @@ router.post('/callback', async (req, res) => {
     });
   } catch (error) {
     console.error('OAuth callback error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ error: 'Internal server error', details: error.message });
   }
 });
 
@@ -172,10 +193,63 @@ router.post('/signout', async (req, res) => {
   }
 });
 
+// Handle direct token authentication (for implicit flow)
+router.post('/token', async (req, res) => {
+  try {
+    const { access_token, refresh_token } = req.body;
+
+    console.log('Token authentication attempt:', { hasAccessToken: !!access_token, hasRefreshToken: !!refresh_token });
+
+    if (!access_token) {
+      return res.status(400).json({ error: 'Access token required' });
+    }
+
+    // Verify the token and get user
+    const { data: { user }, error } = await supabase.auth.getUser(access_token);
+
+    if (error) {
+      console.error('Token verification error:', error.message);
+      return res.status(401).json({ error: error.message });
+    }
+
+    console.log('Token verified for user:', user?.email);
+
+    // Set session cookies
+    const cookieOptions = {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+      path: '/'
+    };
+
+    res.cookie('sb-access-token', access_token, {
+      ...cookieOptions,
+      maxAge: 24 * 60 * 60 * 1000 // 24 hours
+    });
+
+    if (refresh_token) {
+      res.cookie('sb-refresh-token', refresh_token, {
+        ...cookieOptions,
+        maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
+      });
+    }
+
+    res.json({
+      message: 'Token authentication successful',
+      user
+    });
+  } catch (error) {
+    console.error('Token authentication error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // Get current user
 router.get('/user', async (req, res) => {
   try {
     const accessToken = req.cookies['sb-access-token'];
+
+    console.log('Get user request:', { hasToken: !!accessToken });
 
     if (!accessToken) {
       return res.status(401).json({ error: 'No access token' });
@@ -184,9 +258,11 @@ router.get('/user', async (req, res) => {
     const { data: { user }, error } = await supabase.auth.getUser(accessToken);
 
     if (error) {
+      console.error('Get user error:', error.message);
       return res.status(401).json({ error: error.message });
     }
 
+    console.log('User retrieved:', user?.email);
     res.json({ user });
   } catch (error) {
     console.error('Get user error:', error);
