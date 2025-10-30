@@ -20,7 +20,11 @@ const supabase = createClient(
 // Middleware
 const allowedOrigins = [
     process.env.CLIENT_URL,
-    'https://notes-app-xl-eight-17.vercel.app' // Fallback Vercel URL
+    'https://notes-app-xl-eight-17.vercel.app', // Production Vercel URL
+    'https://notes-5l06weonn-gugans-projects-4bb04bdf.vercel.app', // New Vercel deployment
+    'http://localhost:3000', // Local development
+    'http://localhost:3001',
+    'http://localhost:3002'
 ].filter(Boolean);
 
 app.use(cors({
