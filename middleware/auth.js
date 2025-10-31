@@ -61,6 +61,7 @@ const ensureUserExists = async (user) => {
 
     if (fetchError && fetchError.code === 'PGRST116') {
       // User doesn't exist, create them
+      console.log('Creating new user in database:', user.email);
       const { error: insertError } = await supabase
         .from('users')
         .insert([{
@@ -73,12 +74,19 @@ const ensureUserExists = async (user) => {
 
       if (insertError) {
         console.error('Error creating user in database:', insertError);
+        // Don't throw error, just log it - user can still proceed
       } else {
-        console.log('Created new user in database:', user.email);
+        console.log('Successfully created new user in database:', user.email);
       }
+    } else if (fetchError) {
+      console.error('Error checking if user exists:', fetchError);
+      // Don't throw error, just log it
+    } else {
+      console.log('User already exists in database:', user.email);
     }
   } catch (error) {
     console.error('Error ensuring user exists:', error);
+    // Don't throw error, just log it - user can still proceed
   }
 };
 

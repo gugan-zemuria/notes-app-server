@@ -471,6 +471,9 @@ app.get('/api/notes', authenticateUser, async (req, res) => {
 // Create a new post (note)
 app.post('/api/notes', authenticateUser, async (req, res) => {
     try {
+        console.log('Create note request received from user:', req.user?.email);
+        console.log('Request body:', JSON.stringify(req.body, null, 2));
+
         const {
             title,
             content,
@@ -483,33 +486,50 @@ app.post('/api/notes', authenticateUser, async (req, res) => {
         } = req.body;
         const userId = req.user.id;
 
+        console.log('Creating note for user ID:', userId);
+
+        // Validate required fields
+        if (!title && !content) {
+            return res.status(400).json({ error: 'Title or content is required' });
+        }
+
         // Generate public share token if public
         const public_share_token = is_public ?
             require('crypto').randomBytes(32).toString('hex') : null;
 
+        const noteData = {
+            title: title || 'Untitled',
+            content: is_encrypted ? null : content,
+            encrypted_content: is_encrypted ? encrypted_content : null,
+            category_id: category_id || null,
+            user_id: userId,
+            is_draft,
+            is_public,
+            is_encrypted,
+            public_share_token,
+            last_autosave: new Date(),
+            updated_at: new Date()
+        };
+
+        console.log('Inserting note data:', JSON.stringify(noteData, null, 2));
+
         // Create the post
         const { data: postData, error: postError } = await supabase
             .from('posts')
-            .insert([{
-                title,
-                content: is_encrypted ? null : content,
-                encrypted_content: is_encrypted ? encrypted_content : null,
-                category_id: category_id || null,
-                user_id: userId,
-                is_draft,
-                is_public,
-                is_encrypted,
-                public_share_token,
-                last_autosave: new Date(),
-                updated_at: new Date()
-            }])
+            .insert([noteData])
             .select()
             .single();
 
-        if (postError) throw postError;
+        if (postError) {
+            console.error('Error creating post:', postError);
+            throw postError;
+        }
+
+        console.log('Post created successfully:', postData.id);
 
         // Add labels if provided
         if (label_ids && label_ids.length > 0) {
+            console.log('Adding labels:', label_ids);
             const labelInserts = label_ids.map(labelId => ({
                 post_id: postData.id,
                 label_id: labelId
@@ -519,10 +539,15 @@ app.post('/api/notes', authenticateUser, async (req, res) => {
                 .from('post_labels')
                 .insert(labelInserts);
 
-            if (labelError) throw labelError;
+            if (labelError) {
+                console.error('Error adding labels:', labelError);
+                throw labelError;
+            }
+            console.log('Labels added successfully');
         }
 
         // Fetch the complete post with category and labels
+        console.log('Fetching complete post data...');
         const { data: completePost, error: fetchError } = await supabase
             .from('posts')
             .select(`
@@ -535,7 +560,18 @@ app.post('/api/notes', authenticateUser, async (req, res) => {
             .eq('id', postData.id)
             .single();
 
-        if (fetchError) throw fetchError;
+        if (fetchError) {
+            console.error('Error fetching complete post:', fetchError);
+            // If relationship fetch fails, return simple post data
+            const transformedPost = {
+                ...postData,
+                labels: [],
+                category: null,
+                display_date: postData.is_updated ? postData.updated_at : postData.created_at,
+                date_type: postData.is_updated ? 'updated' : 'created'
+            };
+            return res.status(201).json(transformedPost);
+        }
 
         // Transform the data
         const transformedPost = {
@@ -546,9 +582,14 @@ app.post('/api/notes', authenticateUser, async (req, res) => {
             date_type: completePost.is_updated ? 'updated' : 'created'
         };
 
+        console.log('Note created successfully:', transformedPost.id);
         res.status(201).json(transformedPost);
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        console.error('Create note error:', error);
+        res.status(500).json({ 
+            error: error.message,
+            details: error.details || 'Unknown error occurred'
+        });
     }
 });
 
