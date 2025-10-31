@@ -80,6 +80,70 @@ app.get('/api/debug/cookies', (req, res) => {
     });
 });
 
+// Debug endpoint to test note creation without auth
+app.post('/api/debug/create-note', async (req, res) => {
+    try {
+        console.log('Debug create note request:', req.body);
+        
+        // Test database connection
+        const { data: testData, error: testError } = await supabase
+            .from('posts')
+            .select('id')
+            .limit(1);
+            
+        if (testError) {
+            return res.status(500).json({
+                error: 'Database connection failed',
+                details: testError.message
+            });
+        }
+        
+        // Test with a hardcoded user ID
+        const testUserId = '93ab2a88-6e1a-428b-86c4-91db17320cb9';
+        
+        const noteData = {
+            title: 'Debug Test Note',
+            content: 'This is a debug test note',
+            user_id: testUserId,
+            is_draft: false,
+            is_public: false,
+            is_encrypted: false,
+            created_at: new Date(),
+            updated_at: new Date()
+        };
+        
+        console.log('Attempting to insert note:', noteData);
+        
+        const { data: postData, error: postError } = await supabase
+            .from('posts')
+            .insert([noteData])
+            .select()
+            .single();
+            
+        if (postError) {
+            console.error('Debug create note error:', postError);
+            return res.status(500).json({
+                error: 'Failed to create debug note',
+                details: postError.message,
+                code: postError.code
+            });
+        }
+        
+        res.json({
+            success: true,
+            message: 'Debug note created successfully',
+            note: postData
+        });
+        
+    } catch (error) {
+        console.error('Debug create note exception:', error);
+        res.status(500).json({
+            error: 'Exception in debug create note',
+            details: error.message
+        });
+    }
+});
+
 // Test endpoint to set a cookie
 app.post('/api/debug/set-cookie', (req, res) => {
     console.log('Setting test cookie from:', req.headers.origin);
@@ -719,6 +783,42 @@ app.get('/api/categories', authenticateUser, async (req, res) => {
             }
             throw error;
         }
+
+        // If user has no categories, create default ones
+        if (!data || data.length === 0) {
+            console.log('No categories found for user, creating default categories');
+            
+            const defaultCategories = [
+                { name: 'Personal', color: '#3B82F6', icon: '👤' },
+                { name: 'Work', color: '#EF4444', icon: '💼' },
+                { name: 'Ideas', color: '#8B5CF6', icon: '💡' },
+                { name: 'Tasks', color: '#F59E0B', icon: '✅' },
+                { name: 'Projects', color: '#10B981', icon: '🚀' },
+                { name: 'Learning', color: '#F97316', icon: '📚' },
+                { name: 'Health', color: '#EC4899', icon: '🏥' },
+                { name: 'Finance', color: '#06B6D4', icon: '💰' }
+            ];
+
+            // Insert default categories for this user
+            const categoriesToInsert = defaultCategories.map(cat => ({
+                ...cat,
+                user_id: userId
+            }));
+
+            const { data: newCategories, error: insertError } = await supabase
+                .from('categories')
+                .insert(categoriesToInsert)
+                .select();
+
+            if (insertError) {
+                console.error('Error creating default categories:', insertError);
+                throw insertError;
+            }
+
+            console.log('Default categories created for user:', userId);
+            return res.json(newCategories || []);
+        }
+
         res.json(data || []);
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -776,6 +876,42 @@ app.get('/api/labels', authenticateUser, async (req, res) => {
             }
             throw error;
         }
+
+        // If user has no labels, create default ones
+        if (!data || data.length === 0) {
+            console.log('No labels found for user, creating default labels');
+            
+            const defaultLabels = [
+                { name: 'Important', color: '#EF4444' },
+                { name: 'Urgent', color: '#F59E0B' },
+                { name: 'Review', color: '#8B5CF6' },
+                { name: 'Archive', color: '#6B7280' },
+                { name: 'Draft', color: '#10B981' },
+                { name: 'In Progress', color: '#3B82F6' },
+                { name: 'Completed', color: '#059669' },
+                { name: 'On Hold', color: '#DC2626' }
+            ];
+
+            // Insert default labels for this user
+            const labelsToInsert = defaultLabels.map(label => ({
+                ...label,
+                user_id: userId
+            }));
+
+            const { data: newLabels, error: insertError } = await supabase
+                .from('labels')
+                .insert(labelsToInsert)
+                .select();
+
+            if (insertError) {
+                console.error('Error creating default labels:', insertError);
+                throw insertError;
+            }
+
+            console.log('Default labels created for user:', userId);
+            return res.json(newLabels || []);
+        }
+
         res.json(data || []);
     } catch (error) {
         res.status(500).json({ error: error.message });
