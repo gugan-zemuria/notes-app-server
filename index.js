@@ -80,6 +80,52 @@ app.get('/api/debug/cookies', (req, res) => {
     });
 });
 
+// Debug endpoint to check user's categories and labels
+app.get('/api/debug/user-data', authenticateUser, async (req, res) => {
+    try {
+        const userId = req.user.id;
+        console.log('Debug user data request for user:', userId);
+        
+        // Get user's categories
+        const { data: categories, error: catError } = await supabase
+            .from('categories')
+            .select('*')
+            .eq('user_id', userId);
+            
+        // Get user's labels  
+        const { data: labels, error: labelError } = await supabase
+            .from('labels')
+            .select('*')
+            .eq('user_id', userId);
+            
+        // Get user's posts
+        const { data: posts, error: postError } = await supabase
+            .from('posts')
+            .select('*')
+            .eq('user_id', userId);
+        
+        res.json({
+            userId,
+            userEmail: req.user.email,
+            categories: categories || [],
+            categoriesCount: categories?.length || 0,
+            categoriesError: catError?.message,
+            labels: labels || [],
+            labelsCount: labels?.length || 0,
+            labelsError: labelError?.message,
+            posts: posts || [],
+            postsCount: posts?.length || 0,
+            postsError: postError?.message
+        });
+    } catch (error) {
+        res.status(500).json({ 
+            error: error.message,
+            userId: req.user?.id,
+            userEmail: req.user?.email
+        });
+    }
+});
+
 // Debug endpoint to test note creation without auth
 app.post('/api/debug/create-note', async (req, res) => {
     try {
@@ -211,6 +257,76 @@ app.get('/api/status', async (req, res) => {
     }
 });
 
+
+// Force create categories and labels for current user
+app.post('/api/debug/force-create-defaults', authenticateUser, async (req, res) => {
+    try {
+        const userId = req.user.id;
+        console.log('Force creating defaults for user:', userId);
+
+        // Delete existing categories and labels for this user first
+        await supabase.from('categories').delete().eq('user_id', userId);
+        await supabase.from('labels').delete().eq('user_id', userId);
+
+        // Create default categories
+        const defaultCategories = [
+            { name: 'Personal', color: '#3B82F6', icon: '👤' },
+            { name: 'Work', color: '#EF4444', icon: '💼' },
+            { name: 'Ideas', color: '#8B5CF6', icon: '💡' },
+            { name: 'Tasks', color: '#F59E0B', icon: '✅' },
+            { name: 'Projects', color: '#10B981', icon: '🚀' },
+            { name: 'Learning', color: '#F97316', icon: '📚' },
+            { name: 'Health', color: '#EC4899', icon: '🏥' },
+            { name: 'Finance', color: '#06B6D4', icon: '💰' }
+        ];
+
+        const categoriesToInsert = defaultCategories.map(cat => ({
+            ...cat,
+            user_id: userId
+        }));
+
+        const { data: newCategories, error: catError } = await supabase
+            .from('categories')
+            .insert(categoriesToInsert)
+            .select();
+
+        // Create default labels
+        const defaultLabels = [
+            { name: 'Important', color: '#EF4444' },
+            { name: 'Urgent', color: '#F59E0B' },
+            { name: 'Review', color: '#8B5CF6' },
+            { name: 'Archive', color: '#6B7280' },
+            { name: 'Draft', color: '#10B981' },
+            { name: 'In Progress', color: '#3B82F6' },
+            { name: 'Completed', color: '#059669' },
+            { name: 'On Hold', color: '#DC2626' }
+        ];
+
+        const labelsToInsert = defaultLabels.map(label => ({
+            ...label,
+            user_id: userId
+        }));
+
+        const { data: newLabels, error: labelError } = await supabase
+            .from('labels')
+            .insert(labelsToInsert)
+            .select();
+
+        res.json({
+            message: 'Default categories and labels force-created for user',
+            userId,
+            categories: newCategories || [],
+            categoriesError: catError?.message,
+            labels: newLabels || [],
+            labelsError: labelError?.message
+        });
+    } catch (error) {
+        res.status(500).json({ 
+            error: error.message,
+            userId: req.user?.id 
+        });
+    }
+});
 
 // Initialize default categories and labels (for development only)
 app.post('/api/init-defaults', async (req, res) => {
